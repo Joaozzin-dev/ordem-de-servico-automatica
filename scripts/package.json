@@ -1,0 +1,15 @@
+{
+  "name": "os-automatica-script",
+  "version": "1.0.0",
+  "description": "Script para criar OS automática",
+  "main": "criar-os-automatica.js",
+  "scripts": {
+    "start": "node criar-os-automatica.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
