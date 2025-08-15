@@ -1,0 +1,38 @@
+name: Criar OS Automática
+
+on:
+  # Executa às 6h UTC = 3h Brasília
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Permite execução manual
+  workflow_dispatch:
+
+  # Webhook para ser chamado pelo cron-job.org
+  repository_dispatch:
+    types: [criar-os]
+
+jobs:
+  criar-os-automatica:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: |
+        cd scripts
+        npm install
+    
+    - name: Execute OS creation
+      env:
+        FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      run: |
+        cd scripts
+        node criar-os-automatica.js
