@@ -23,21 +23,21 @@ async function criarOSAutomatica() {
     
     console.log(`📅 Buscando OS para a data: ${hoje}`);
     
-    // Buscar documentos com proximaManutencao igual a hoje
+    // Buscar TODAS as OS que têm proximaManutencao (qualquer tipo de serviço)
     const osSnapshot = await db.collection('ordens_de_servico')
-      .where('proximaManutencao', '==', hoje)
-      .where('tipoServico', '==', 'PMOC (Plano de Manutenção, Operação e Controle)')
+      .where('proximaManutencao', '!=', null)
       .get();
     
-    console.log(`📋 Encontradas ${osSnapshot.size} OS para processar.`);
+    console.log(`📋 Encontradas ${osSnapshot.size} OS com proximaManutencao definida.`);
     
     if (osSnapshot.empty) {
-      console.log('✅ Nenhuma OS encontrada para criar hoje.');
-      return { success: true, osCreated: 0, message: 'Nenhuma OS para criar' };
+      console.log('✅ Nenhuma OS encontrada.');
+      return { success: true, osCreated: 0, message: 'Nenhuma OS para processar' };
     }
     
     let osCreated = 0;
     let osDuplicadas = 0;
+    let osForaData = 0;
     const erros = [];
     
     // Processar cada documento
@@ -46,7 +46,27 @@ async function criarOSAutomatica() {
         const osData = doc.data();
         const docId = doc.id;
         
-        console.log(`🔧 Processando: ${osData.cliente}`);
+        // Extrair data da proximaManutencao (pode ser string ou timestamp)
+        let proximaManutencaoData;
+        
+        if (typeof osData.proximaManutencao === 'string') {
+          // Se for string no formato ISO (2025-08-17T03:10:36.672Z)
+          proximaManutencaoData = osData.proximaManutencao.split('T')[0];
+        } else if (osData.proximaManutencao?.toDate) {
+          // Se for Firestore Timestamp
+          proximaManutencaoData = osData.proximaManutencao.toDate().toISOString().split('T')[0];
+        } else {
+          console.log(`⚠️  Formato de data inválido para ${osData.cliente}: ${osData.proximaManutencao}`);
+          continue;
+        }
+        
+        // Verificar se a data da próxima manutenção é hoje
+        if (proximaManutencaoData !== hoje) {
+          osForaData++;
+          continue;
+        }
+        
+        console.log(`🔧 Processando: ${osData.cliente} - Tipo: ${osData.tipoServico}`);
         
         // Verificar duplicatas
         const existingOSSnapshot = await db.collection('ordens_de_servico')
@@ -78,7 +98,7 @@ async function criarOSAutomatica() {
         
         // Salvar nova OS
         await db.collection('ordens_de_servico').add(novaOS);
-        console.log(`✅ OS criada para: ${osData.cliente}`);
+        console.log(`✅ OS criada para: ${osData.cliente} - ${osData.tipoServico}`);
         osCreated++;
         
         // Atualizar próxima manutenção
@@ -100,12 +120,14 @@ async function criarOSAutomatica() {
     console.log(`🎉 Processo finalizado!`);
     console.log(`✅ OS criadas: ${osCreated}`);
     console.log(`⚠️  Duplicadas ignoradas: ${osDuplicadas}`);
+    console.log(`📊 Fora da data: ${osForaData}`);
     console.log(`❌ Erros: ${erros.length}`);
     
     return {
       success: true,
       osCreated,
       osDuplicadas,
+      osForaData,
       erros: erros.length,
       timestamp: hoje
     };
